@@ -129,7 +129,7 @@ for (var i = 0; i < nodes.length; i++) {
       ',"visible":' + (vis ? 'true' : 'false') +
       ',"text":' + q(cut(clean(g(el, 'innerText') || g(el, 'textContent') || g(el, 'alt') || g(el, 'title')), 80)) +
       ',"label":' + q(cut(lbl, 80)) +
-      ',"onclick":' + q(cut(ga(el, 'onclick'), 160)) +
+      ',"onclick":' + q(cut(ga(el, 'onclick') || String(g(el, 'onclick') || ''), 300)) +
       ',"href":' + q(tag === 'A' ? cut(ga(el, 'href'), 160) : '') +
       ',"options":[' + opts.join(',') + ']}';
   } catch (e) {
@@ -322,6 +322,8 @@ class Capture {
           const key = c.id ? `#${c.id}` : c.name ? `@${c.name}` : '-';
           const what = c.label || c.text || c.value;
           console.log(`   ${String(c.n).padStart(3)} ${c.tag}${c.type ? ':' + c.type : ''} ${key} ${what ? '"' + what + '"' : ''}${c.disabled ? ' (disabled)' : ''}${c.visible ? '' : ' (hidden)'}`);
+          const oc = (c as Control & { onclick?: string }).onclick;
+          if (oc) console.log(`         onclick: ${oc.replace(/\s+/g, ' ').slice(0, 140)}`);
         }
       } catch (e) {
         console.log(`  ! ${(e as Error).message}`);
