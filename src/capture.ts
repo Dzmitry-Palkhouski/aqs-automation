@@ -42,6 +42,14 @@ var TAGS = { INPUT: 1, SELECT: 1, TEXTAREA: 1, BUTTON: 1, A: 1 };
 // Old IE throws on some property reads ("Invalid procedure call or
 // argument"); every read goes through these.
 function g(o, k) { try { var v = o[k]; return v == null ? '' : v; } catch (e) { return ''; } }
+// Handler source; String(handler) itself throws in IE5 quirks mode.
+function handlerText(el) {
+  var a = ga(el, 'onclick');
+  if (a) return a;
+  var h = g(el, 'onclick');
+  if (!h) return '';
+  try { return String(h); } catch (e) { return '[handler]'; }
+}
 function ga(el, name) {
   try { var v = el.getAttribute ? el.getAttribute(name) : null; return v == null ? '' : String(v); } catch (e) { return ''; }
 }
@@ -129,7 +137,7 @@ for (var i = 0; i < nodes.length; i++) {
       ',"visible":' + (vis ? 'true' : 'false') +
       ',"text":' + q(cut(clean(g(el, 'innerText') || g(el, 'textContent') || g(el, 'alt') || g(el, 'title')), 80)) +
       ',"label":' + q(cut(lbl, 80)) +
-      ',"onclick":' + q(cut(ga(el, 'onclick') || String(g(el, 'onclick') || ''), 300)) +
+      ',"onclick":' + q(cut(handlerText(el), 300)) +
       ',"href":' + q(tag === 'A' ? cut(ga(el, 'href'), 160) : '') +
       ',"options":[' + opts.join(',') + ']}';
   } catch (e) {
