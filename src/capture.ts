@@ -52,7 +52,7 @@ function gather() {
     var el = all[i];
     if (el.className === '__cap_ov') continue;
     var tag = g(el, 'tagName');
-    var oc = ga(el, 'onclick');
+    var oc = ga(el, 'onclick') || (g(el, 'onclick') ? 'handler' : '');
     if (TAGS[tag] || (oc && oc.length > 0)) res[res.length] = el;
   }
   return res;
@@ -63,8 +63,21 @@ function q(s) {
   return '"' + String(s).replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"')
     .replace(/[\\u0000-\\u001f]/g, ' ') + '"';
 }
+// Viewport rectangle; falls back to offset* (page coordinates, abs: true)
+// where getBoundingClientRect fails or reports nothing.
 function rect(el) {
-  try { var r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; } catch (e) { return null; }
+  try {
+    var r = el.getBoundingClientRect();
+    var o = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, abs: false };
+    if (o.right - o.left > 0 && o.bottom - o.top > 0) return o;
+  } catch (e) {}
+  try {
+    var w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return null;
+    var x = 0, y = 0, p = el;
+    while (p) { x += p.offsetLeft || 0; y += p.offsetTop || 0; p = p.offsetParent; }
+    return { left: x, top: y, right: x + w, bottom: y + h, abs: true };
+  } catch (e) { return null; }
 }
 `;
 
@@ -126,6 +139,7 @@ for (var i = 0; i < nodes.length; i++) {
 }
 return '{"url":' + q(g(document.location, 'href')) + ',"title":' + q(g(document, 'title')) +
   ',"docMode":' + q(g(document, 'documentMode') || g(document, 'compatMode')) +
+  ',"elements":' + document.getElementsByTagName('*').length +
   ',"controls":[' + parts.join(',') + ']}';
 `;
 
@@ -158,8 +172,9 @@ for (var i = 0; i < nodes.length; i++) {
   d.appendChild(document.createTextNode('#' + (BASE + i) + (key ? ' ' + key : '')));
   var s = d.style;
   s.position = 'absolute';
-  s.left = (r.left + sx) + 'px';
-  s.top = (r.top + sy - 11 < 0 ? 0 : r.top + sy - 11) + 'px';
+  var ox = r.abs ? 0 : sx, oy = r.abs ? 0 : sy;
+  s.left = (r.left + ox) + 'px';
+  s.top = (r.top + oy - 11 < 0 ? 0 : r.top + oy - 11) + 'px';
   s.backgroundColor = '#ffeb3b';
   s.color = '#000000';
   s.fontFamily = 'Arial';
@@ -292,14 +307,21 @@ class Capture {
     await forEachFrame(this.driver, async (fp) => {
       try {
         const json = (await withTimeout(this.driver.executeScript(COLLECT_CONTROLS), CALL_TIMEOUT, 'controls')) as string;
-        const { title, controls } = JSON.parse(json) as { title: string; controls: Control[] };
-        const shown = controls.filter((c) => c.visible).map((c) => ({ ...c, n: c.n + base }));
+        const { title, controls, docMode, elements } = JSON.parse(json) as {
+          title: string; controls: Control[]; docMode: string; elements: number;
+        };
+        let shown = controls.filter((c) => c.visible).map((c) => ({ ...c, n: c.n + base }));
+        console.log(
+          `  ${title}${fp.length ? ` [frame ${fp.join('-')}]` : ''}: ${shown.length} visible of ${controls.length} controls` +
+            ` (${elements} elements, docMode ${docMode})`,
+        );
+        // Nothing reported visible: list everything so the page is not a blank.
+        if (!shown.length) shown = controls.map((c) => ({ ...c, n: c.n + base }));
         base += controls.length;
-        console.log(`  ${title}${fp.length ? ` [frame ${fp.join('-')}]` : ''}: ${shown.length} visible controls`);
         for (const c of shown) {
           const key = c.id ? `#${c.id}` : c.name ? `@${c.name}` : '-';
           const what = c.label || c.text || c.value;
-          console.log(`   ${String(c.n).padStart(3)} ${c.tag}${c.type ? ':' + c.type : ''} ${key} ${what ? '"' + what + '"' : ''}${c.disabled ? ' (disabled)' : ''}`);
+          console.log(`   ${String(c.n).padStart(3)} ${c.tag}${c.type ? ':' + c.type : ''} ${key} ${what ? '"' + what + '"' : ''}${c.disabled ? ' (disabled)' : ''}${c.visible ? '' : ' (hidden)'}`);
         }
       } catch (e) {
         console.log(`  ! ${(e as Error).message}`);
