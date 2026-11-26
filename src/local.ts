@@ -11,10 +11,19 @@ interface LocalConfig {
 }
 
 const FILE = path.resolve(__dirname, '..', 'aqs.local.json');
+// Shortcut for the VM, where typing is slow: a one-line file with just the
+// host name, e.g. created with `sc aqs.host aqs.example.com`.
+const HOST_FILE = path.resolve(__dirname, '..', 'aqs.host');
 
 function load(): LocalConfig {
-  if (!fs.existsSync(FILE)) return {};
-  return JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^﻿/, '')) as LocalConfig;
+  if (fs.existsSync(FILE)) {
+    return JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^﻿/, '')) as LocalConfig;
+  }
+  if (fs.existsSync(HOST_FILE)) {
+    const host = fs.readFileSync(HOST_FILE, 'utf8').replace(/^﻿/, '').replace(/\u0000/g, '').trim();
+    if (host) return { aqsBaseUrl: /^https?:\/\//.test(host) ? host : `https://${host}` };
+  }
+  return {};
 }
 
 export const LOCAL = load();
