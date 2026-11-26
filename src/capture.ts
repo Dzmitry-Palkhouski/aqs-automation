@@ -39,14 +39,21 @@ const CALL_TIMEOUT = 15_000;
 // index n is the same in the controls list and in the overlay labels.
 const PAGE_HELPERS = `
 var TAGS = { INPUT: 1, SELECT: 1, TEXTAREA: 1, BUTTON: 1, A: 1 };
+// Old IE throws on some property reads ("Invalid procedure call or
+// argument"); every read goes through these.
+function g(o, k) { try { var v = o[k]; return v == null ? '' : v; } catch (e) { return ''; } }
+function ga(el, name) {
+  try { var v = el.getAttribute ? el.getAttribute(name) : null; return v == null ? '' : String(v); } catch (e) { return ''; }
+}
 function gather() {
   var all = document.getElementsByTagName('*');
   var res = [];
   for (var i = 0; i < all.length; i++) {
     var el = all[i];
     if (el.className === '__cap_ov') continue;
-    var oc = el.getAttribute ? el.getAttribute('onclick') : null;
-    if (TAGS[el.tagName] || (oc && String(oc).length > 0)) res[res.length] = el;
+    var tag = g(el, 'tagName');
+    var oc = ga(el, 'onclick');
+    if (TAGS[tag] || (oc && oc.length > 0)) res[res.length] = el;
   }
   return res;
 }
@@ -57,7 +64,7 @@ function q(s) {
     .replace(/[\\u0000-\\u001f]/g, ' ') + '"';
 }
 function rect(el) {
-  try { var r = el.getBoundingClientRect(); return r; } catch (e) { return null; }
+  try { var r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; } catch (e) { return null; }
 }
 `;
 
@@ -83,32 +90,42 @@ var nodes = gather();
 var parts = [];
 for (var i = 0; i < nodes.length; i++) {
   var el = nodes[i];
-  var r = rect(el);
-  var vis = !!r && (r.right - r.left) > 0 && (r.bottom - r.top) > 0;
-  var opts = [];
-  if (el.tagName === 'SELECT') {
-    for (var j = 0; j < el.options.length && j < 200; j++) {
-      opts[opts.length] = '{"value":' + q(el.options[j].value) + ',"text":' + q(el.options[j].text) + '}';
+  try {
+    var tag = String(g(el, 'tagName'));
+    var r = rect(el);
+    var vis = !!r && (r.right - r.left) > 0 && (r.bottom - r.top) > 0;
+    var opts = [];
+    if (tag === 'SELECT') {
+      var os = g(el, 'options');
+      for (var j = 0; os && j < os.length && j < 200; j++) {
+        opts[opts.length] = '{"value":' + q(g(os[j], 'value')) + ',"text":' + q(g(os[j], 'text')) + '}';
+      }
     }
+    var type = String(g(el, 'type'));
+    var v = type === 'password' ? '***' : g(el, 'value');
+    var lbl = '';
+    try { lbl = labelFor(el); } catch (e) {}
+    parts[parts.length] = '{"n":' + i +
+      ',"tag":' + q(tag.toLowerCase()) +
+      ',"type":' + q(type) +
+      ',"id":' + q(g(el, 'id')) +
+      ',"name":' + q(g(el, 'name')) +
+      ',"value":' + q(cut(v, 80)) +
+      ',"checked":' + (g(el, 'checked') ? 'true' : 'false') +
+      ',"disabled":' + (g(el, 'disabled') ? 'true' : 'false') +
+      ',"visible":' + (vis ? 'true' : 'false') +
+      ',"text":' + q(cut(clean(g(el, 'innerText') || g(el, 'textContent') || g(el, 'alt') || g(el, 'title')), 80)) +
+      ',"label":' + q(cut(lbl, 80)) +
+      ',"onclick":' + q(cut(ga(el, 'onclick'), 160)) +
+      ',"href":' + q(tag === 'A' ? cut(ga(el, 'href'), 160) : '') +
+      ',"options":[' + opts.join(',') + ']}';
+  } catch (e) {
+    parts[parts.length] = '{"n":' + i + ',"tag":"?","type":"","id":"","name":"","value":"","checked":false,"disabled":false,"visible":false,"text":' +
+      q('error: ' + (e && e.message)) + ',"label":"","onclick":"","href":"","options":[]}';
   }
-  var v = el.tagName === 'SELECT' ? el.value : (el.type === 'password' ? '***' : el.value);
-  parts[parts.length] = '{"n":' + i +
-    ',"tag":' + q(String(el.tagName).toLowerCase()) +
-    ',"type":' + q(el.type || '') +
-    ',"id":' + q(el.id || '') +
-    ',"name":' + q(el.name || '') +
-    ',"value":' + q(cut(v, 80)) +
-    ',"checked":' + (el.checked ? 'true' : 'false') +
-    ',"disabled":' + (el.disabled ? 'true' : 'false') +
-    ',"visible":' + (vis ? 'true' : 'false') +
-    ',"text":' + q(cut(clean(el.innerText || el.textContent || el.alt || el.title), 80)) +
-    ',"label":' + q(cut(labelFor(el), 80)) +
-    ',"onclick":' + q(cut(el.getAttribute('onclick'), 160)) +
-    ',"href":' + q(el.tagName === 'A' ? cut(el.getAttribute('href'), 160) : '') +
-    ',"options":[' + opts.join(',') + ']}';
 }
-return '{"url":' + q(document.location.href) + ',"title":' + q(document.title) +
-  ',"docMode":' + q(document.documentMode || document.compatMode || '') +
+return '{"url":' + q(g(document.location, 'href')) + ',"title":' + q(g(document, 'title')) +
+  ',"docMode":' + q(g(document, 'documentMode') || g(document, 'compatMode')) +
   ',"controls":[' + parts.join(',') + ']}';
 `;
 
@@ -134,7 +151,8 @@ for (var i = 0; i < nodes.length; i++) {
   var el = nodes[i];
   var r = rect(el);
   if (!r || (r.right - r.left) <= 0 || (r.bottom - r.top) <= 0) continue;
-  var key = el.id ? el.id : (el.name ? '@' + el.name : '');
+  var eid = g(el, 'id'), ename = g(el, 'name');
+  var key = eid ? eid : (ename ? '@' + ename : '');
   var d = document.createElement('div');
   d.className = '__cap_ov';
   d.appendChild(document.createTextNode('#' + (BASE + i) + (key ? ' ' + key : '')));
@@ -152,8 +170,7 @@ for (var i = 0; i < nodes.length; i++) {
   s.zIndex = '32000';
   s.whiteSpace = 'nowrap';
   try { s.pointerEvents = 'none'; } catch (e) {}
-  body.appendChild(d);
-  drawn++;
+  try { body.appendChild(d); drawn++; } catch (e) {}
 }
 return drawn + ',' + nodes.length;
 `;
