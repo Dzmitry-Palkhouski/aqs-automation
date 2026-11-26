@@ -7,7 +7,8 @@
     "capture": "ts-node src/capture.ts",
     "test:retrieval": "ts-node tests/retrieval.test.ts",
     "test:crime": "ts-node tests/crime-policy.test.ts",
-    "test:ocp": "ts-node tests/ocp-pa.test.ts"
+    "test:ocp": "ts-node tests/ocp-pa.test.ts",
+    "update": "powershell -NoProfile -ExecutionPolicy Bypass -File update.ps1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

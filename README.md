@@ -15,17 +15,17 @@
 
 ## 1. Получение кода на VM
 
+На VM нет git, поэтому первый раз код скачивается архивом (PowerShell):
+
 ```powershell
-cd $HOME\Downloads
-git clone <repo-url> aqs-automation-git
-cd aqs-automation-git
+cd ~; iwr https://github.com/dzmitry-palkhouski/aqs-automation/archive/main.zip -o a.zip; expand-archive a.zip . -force; cd aqs-automation-main
 ```
 
-Обновление: `git pull`.
+Обновление: `npm run update` (скачивает свежий `main` и раскладывает поверх; `node_modules`, `captures`, `aqs.host` не трогает).
 
 ## 2. Подготовка на VM (один раз)
 
-Скопируйте `aqs.local.example.json` в `aqs.local.json` и впишите адрес AQS и тестовый полис. Файл в `.gitignore`: внутренние адреса и номера полисов в репозиторий не попадают.
+Скопируйте `aqs.local.example.json` в `aqs.local.json` и впишите адрес AQS и тестовый полис. Короче: `sc aqs.host <хост AQS>` (только адрес, без полиса). Файл в `.gitignore`: внутренние адреса и номера полисов в репозиторий не попадают.
 
 ```powershell
 npm install
