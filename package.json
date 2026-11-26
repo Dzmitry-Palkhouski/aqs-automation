@@ -1,0 +1,19 @@
+{
+  "name": "aqs-automation",
+  "private": true,
+  "description": "AQS / TestHarness UI automation in Edge IE mode (locator capture + scenario tests)",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "capture": "ts-node src/capture.ts",
+    "test:retrieval": "ts-node tests/retrieval.test.ts",
+    "test:crime": "ts-node tests/crime-policy.test.ts",
+    "test:ocp": "ts-node tests/ocp-pa.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/selenium-webdriver": "^4.1.0",
+    "selenium-webdriver": "^4.20.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}
